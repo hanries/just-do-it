@@ -20,9 +20,18 @@ struct Goal: Identifiable, Codable {
 struct WeekMilestone: Identifiable, Codable {
     var id: UUID = UUID()
     var weekNumber: Int
-    var goal: String           // short milestone summary
-    var tasks: [String] = []   // concrete daily tasks
+    var goal: String            // AI-generated short milestone summary
+    var tasks: [String] = []    // AI-generated suggested tasks
+    var dailyTodos: [DailyTodo] = []  // user-created personal todos
     var isComplete: Bool = false
+}
+
+// User-created daily to-do item within a week
+struct DailyTodo: Identifiable, Codable {
+    var id: UUID = UUID()
+    var text: String
+    var isComplete: Bool = false
+    var createdAt: Date = Date()
 }
 
 // MARK: - Journal Entry
@@ -32,7 +41,7 @@ struct JournalEntry: Identifiable, Codable {
     var date: Date = Date()
     var mood: Mood?
     var text: String
-    var completedTaskKeys: Set<String> = []   // "goalId-weekId-taskIndex"
+    var completedTaskKeys: Set<String> = []
 
     var dateKey: String {
         Calendar.current.startOfDay(for: date).ISO8601Format()

@@ -1,6 +1,6 @@
+import SwiftUI
 import Foundation
 import Combine
-import SwiftUI
 
 @MainActor
 class AppStore: ObservableObject {
@@ -10,9 +10,7 @@ class AppStore: ObservableObject {
     private let goalsKey = "goalos.goals"
     private let entriesKey = "goalos.entries"
 
-    init() {
-        load()
-    }
+    init() { load() }
 
     // MARK: - Goals
 
@@ -40,14 +38,36 @@ class AppStore: ObservableObject {
         persist()
     }
 
+    // MARK: - Daily Todos
+
+    func addTodo(goalId: UUID, weekId: UUID, text: String) {
+        guard let gi = goals.firstIndex(where: { $0.id == goalId }),
+              let wi = goals[gi].weeks.firstIndex(where: { $0.id == weekId }) else { return }
+        let todo = DailyTodo(text: text)
+        goals[gi].weeks[wi].dailyTodos.append(todo)
+        persist()
+    }
+
+    func toggleTodo(goalId: UUID, weekId: UUID, todoId: UUID) {
+        guard let gi = goals.firstIndex(where: { $0.id == goalId }),
+              let wi = goals[gi].weeks.firstIndex(where: { $0.id == weekId }),
+              let ti = goals[gi].weeks[wi].dailyTodos.firstIndex(where: { $0.id == todoId }) else { return }
+        goals[gi].weeks[wi].dailyTodos[ti].isComplete.toggle()
+        persist()
+    }
+
+    func deleteTodo(goalId: UUID, weekId: UUID, todoId: UUID) {
+        guard let gi = goals.firstIndex(where: { $0.id == goalId }),
+              let wi = goals[gi].weeks.firstIndex(where: { $0.id == weekId }) else { return }
+        goals[gi].weeks[wi].dailyTodos.removeAll(where: { $0.id == todoId })
+        persist()
+    }
+
     // MARK: - Journal
 
     func saveEntry(_ entry: JournalEntry) {
-        // Replace if same day exists
         let cal = Calendar.current
-        if let idx = entries.firstIndex(where: {
-            cal.isDate($0.date, inSameDayAs: entry.date)
-        }) {
+        if let idx = entries.firstIndex(where: { cal.isDate($0.date, inSameDayAs: entry.date) }) {
             entries[idx] = entry
         } else {
             entries.insert(entry, at: 0)
@@ -63,7 +83,7 @@ class AppStore: ObservableObject {
         entryForDate(date)?.mood
     }
 
-    // MARK: - Progress stats
+    // MARK: - Stats
 
     var currentStreak: Int {
         var streak = 0
@@ -78,18 +98,14 @@ class AppStore: ObservableObject {
     // MARK: - Persistence
 
     private func persist() {
-        if let gData = try? JSONEncoder().encode(goals) { UserDefaults.standard.set(gData, forKey: goalsKey) }
-        if let eData = try? JSONEncoder().encode(entries) { UserDefaults.standard.set(eData, forKey: entriesKey) }
+        if let d = try? JSONEncoder().encode(goals) { UserDefaults.standard.set(d, forKey: goalsKey) }
+        if let d = try? JSONEncoder().encode(entries) { UserDefaults.standard.set(d, forKey: entriesKey) }
     }
 
     private func load() {
-        if let gData = UserDefaults.standard.data(forKey: goalsKey),
-           let decoded = try? JSONDecoder().decode([Goal].self, from: gData) {
-            goals = decoded
-        }
-        if let eData = UserDefaults.standard.data(forKey: entriesKey),
-           let decoded = try? JSONDecoder().decode([JournalEntry].self, from: eData) {
-            entries = decoded
-        }
+        if let d = UserDefaults.standard.data(forKey: goalsKey),
+           let v = try? JSONDecoder().decode([Goal].self, from: d) { goals = v }
+        if let d = UserDefaults.standard.data(forKey: entriesKey),
+           let v = try? JSONDecoder().decode([JournalEntry].self, from: d) { entries = v }
     }
 }

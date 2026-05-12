@@ -1,5 +1,7 @@
 import SwiftUI
 
+// MARK: - Goal Detail (stages overview)
+
 struct GoalDetailView: View {
     @EnvironmentObject var store: AppStore
     let goal: Goal
@@ -12,38 +14,39 @@ struct GoalDetailView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
 
-                // Header card
-                VStack(alignment: .leading, spacing: 8) {
+                // Header progress card
+                VStack(alignment: .leading, spacing: 10) {
                     Text(liveGoal.text)
                         .font(.system(.title2, design: .serif, weight: .regular))
 
                     HStack {
-                        Label("\(liveGoal.completedWeeks) of \(liveGoal.weeks.count) weeks done",
+                        Label("\(liveGoal.completedWeeks) of \(liveGoal.weeks.count) stages done",
                               systemImage: "checkmark.circle")
                             .font(.caption)
                             .foregroundStyle(.secondary)
-
                         Spacer()
-
                         Text("\(Int(liveGoal.progressFraction * 100))%")
                             .font(.caption.weight(.semibold))
-                            .foregroundStyle(Color("AccentTeal"))
+                            .foregroundStyle(Color.accentTeal)
                     }
 
                     ProgressView(value: liveGoal.progressFraction)
-                        .tint(Color("AccentTeal"))
+                        .tint(Color.accentTeal)
                 }
                 .padding(16)
                 .background(Color(.secondarySystemBackground))
                 .clipShape(RoundedRectangle(cornerRadius: 14))
 
-                // Weekly milestones
-                Text("Weekly milestones")
+                // Stages
+                Text("Stages")
                     .font(.subheadline.weight(.medium))
                     .foregroundStyle(.secondary)
 
                 ForEach(Array(liveGoal.weeks.enumerated()), id: \.element.id) { index, week in
-                    WeekCardView(week: week, weekIndex: index, goalId: liveGoal.id)
+                    NavigationLink(destination: WeekDetailView(week: week, weekIndex: index, goalId: liveGoal.id)) {
+                        StageRowView(week: week, weekIndex: index)
+                    }
+                    .buttonStyle(.plain)
                 }
             }
             .padding(16)
@@ -53,97 +56,63 @@ struct GoalDetailView: View {
     }
 }
 
-// MARK: - Week Card
+// MARK: - Stage Row (tappable card leading to WeekDetailView)
 
-struct WeekCardView: View {
-    @EnvironmentObject var store: AppStore
+struct StageRowView: View {
     let week: WeekMilestone
     let weekIndex: Int
-    let goalId: UUID
 
-    @State private var expanded = false
+    var todosDone: Int { week.dailyTodos.filter(\.isComplete).count }
+    var todosTotal: Int { week.dailyTodos.count }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // Header row
-            Button {
-                withAnimation(.easeInOut(duration: 0.2)) { expanded.toggle() }
-            } label: {
-                HStack(spacing: 12) {
-                    ZStack {
-                        Circle()
-                            .fill(week.isComplete ? Color("AccentTeal") : Color(.tertiarySystemBackground))
-                            .frame(width: 28, height: 28)
-                        if week.isComplete {
-                            Image(systemName: "checkmark")
-                                .font(.caption.weight(.bold))
-                                .foregroundStyle(.white)
-                        } else {
-                            Text("\(weekIndex + 1)")
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Week \(weekIndex + 1)")
-                            .font(.caption)
-                            .foregroundStyle(.tertiary)
-                        Text(week.goal)
-                            .font(.subheadline)
-                            .foregroundStyle(week.isComplete ? .secondary : .primary)
-                            .strikethrough(week.isComplete)
-                            .multilineTextAlignment(.leading)
-                    }
-
-                    Spacer()
-
-                    Image(systemName: expanded ? "chevron.up" : "chevron.down")
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
+        HStack(spacing: 14) {
+            // Stage number / checkmark
+            ZStack {
+                Circle()
+                    .fill(week.isComplete ? Color.accentTeal : Color(.tertiarySystemBackground))
+                    .frame(width: 36, height: 36)
+                if week.isComplete {
+                    Image(systemName: "checkmark")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(.white)
+                } else {
+                    Text("\(weekIndex + 1)")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.secondary)
                 }
-                .padding(14)
             }
-            .buttonStyle(.plain)
 
-            // Expanded tasks
-            if expanded {
-                Divider().padding(.horizontal, 14)
+            VStack(alignment: .leading, spacing: 3) {
+                Text("Week \(weekIndex + 1)")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+                Text(week.goal)
+                    .font(.subheadline)
+                    .foregroundStyle(week.isComplete ? .secondary : .primary)
+                    .strikethrough(week.isComplete)
+                    .multilineTextAlignment(.leading)
 
-                VStack(alignment: .leading, spacing: 10) {
-                    ForEach(week.tasks, id: \.self) { task in
-                        HStack(alignment: .top, spacing: 8) {
-                            Circle()
-                                .fill(Color("AccentTeal").opacity(0.4))
-                                .frame(width: 5, height: 5)
-                                .padding(.top, 6)
-                            Text(task)
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-
-                    if !week.isComplete {
-                        Button {
-                            store.markWeekComplete(goalId: goalId, weekId: week.id)
-                        } label: {
-                            Label("Mark week complete", systemImage: "checkmark.circle.fill")
-                                .font(.subheadline.weight(.medium))
-                                .foregroundStyle(Color("AccentTeal"))
-                        }
-                        .padding(.top, 4)
-                    }
+                if todosTotal > 0 {
+                    Text("\(todosDone)/\(todosTotal) todos done")
+                        .font(.caption2)
+                        .foregroundStyle(Color.accentTeal)
                 }
-                .padding(.horizontal, 14)
-                .padding(.bottom, 14)
             }
+
+            Spacer()
+
+            Image(systemName: "chevron.right")
+                .font(.caption)
+                .foregroundStyle(.tertiary)
         }
+        .padding(14)
         .background(Color(.systemBackground))
         .clipShape(RoundedRectangle(cornerRadius: 14))
         .overlay(
             RoundedRectangle(cornerRadius: 14)
                 .strokeBorder(
-                    week.isComplete ? Color("AccentTeal").opacity(0.3) : Color(.separator).opacity(0.4),
+                    week.isComplete ? Color.accentTeal.opacity(0.3) : Color(.separator).opacity(0.4),
                     lineWidth: week.isComplete ? 1 : 0.5
                 )
         )

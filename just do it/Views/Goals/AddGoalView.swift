@@ -49,7 +49,7 @@ struct AddGoalView: View {
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     if isLoading {
-                        GoalProgressScreen().tint(Color("AccentTeal"))
+                        ProgressView().tint(Color("AccentTeal"))
                     } else {
                         Button("Analyze") {
                             Task { await analyze() }

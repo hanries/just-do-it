@@ -5,35 +5,51 @@ struct GoalsView: View {
     @State private var showingAddGoal = false
 
     var body: some View {
-        Group {
-            if store.goals.isEmpty {
-                GoalsEmptyState()
-            } else {
-                List {
-                    ForEach(store.goals) { goal in
-                        NavigationLink(destination: GoalDetailView(goal: goal)) {
-                            GoalRowView(goal: goal)
+        ZStack(alignment: .bottom) {
+            // Main content
+            Group {
+                if store.goals.isEmpty {
+                    GoalsEmptyState()
+                } else {
+                    List {
+                        ForEach(store.goals) { goal in
+                            NavigationLink(destination: GoalDetailView(goal: goal)) {
+                                GoalRowView(goal: goal)
+                            }
+                            .listRowSeparator(.hidden)
+                            .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
                         }
-                        .listRowSeparator(.hidden)
-                        .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
+                        .onDelete(perform: store.deleteGoal)
+
+                        // Bottom padding so FAB doesn't cover last row
+                        Color.clear.frame(height: 90)
+                            .listRowSeparator(.hidden)
                     }
-                    .onDelete(perform: store.deleteGoal)
+                    .listStyle(.plain)
                 }
-                .listStyle(.plain)
             }
+
+            // Floating action button
+            Button {
+                showingAddGoal = true
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "plus")
+                        .font(.body.weight(.semibold))
+                    Text("New Goal")
+                        .font(.body.weight(.semibold))
+                }
+                .foregroundStyle(.white)
+                .padding(.horizontal, 24)
+                .padding(.vertical, 16)
+                .background(Color.accentTeal)
+                .clipShape(Capsule())
+                .shadow(color: Color.accentTeal.opacity(0.4), radius: 12, x: 0, y: 6)
+            }
+            .padding(.bottom, 24)
         }
         .navigationTitle("Goals")
         .navigationBarTitleDisplayMode(.large)
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    showingAddGoal = true
-                } label: {
-                    Image(systemName: "plus.circle.fill")
-                        .font(.title3)
-                }
-            }
-        }
         .sheet(isPresented: $showingAddGoal) {
             AddGoalView()
         }
@@ -66,7 +82,7 @@ struct GoalRowView: View {
             if let current = goal.currentWeek {
                 HStack(spacing: 6) {
                     RoundedRectangle(cornerRadius: 2)
-                        .fill(Color("AccentTeal"))
+                        .fill(Color.accentTeal)
                         .frame(width: 3, height: 30)
                     Text(current.goal)
                         .font(.caption)
@@ -95,7 +111,7 @@ struct GoalsEmptyState: View {
                 .foregroundStyle(.tertiary)
             Text("No goals yet")
                 .font(.headline)
-            Text("Tap + to add your first big goal.\nClaude will break it into weekly milestones.")
+            Text("Tap the button below to add your first big goal.\nClaude will break it into weekly milestones.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
