@@ -105,18 +105,26 @@ struct GoalRowView: View {
 
 struct GoalsEmptyState: View {
     var body: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "scope")
-                .font(.system(size: 48))
-                .foregroundStyle(.tertiary)
-            Text("No goals yet")
-                .font(.headline)
-            Text("Tap the button below to add your first big goal.\nClaude will break it into weekly milestones.")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
+        VStack {
+            Spacer()
+            
+            VStack(spacing: 16) {
+                Image(systemName: "scope")
+                    .font(.system(size: 48))
+                    .foregroundStyle(.tertiary)
+                Text("No goals yet")
+                    .font(.headline)
+                Text("Tap the button below to add your first big goal.\nClaude will break it into weekly milestones.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+            }
+            .padding(32)
+            
+            Spacer()
+            Spacer() // extra spacer pushes content up from FAB
         }
-        .padding(32)
+        .frame(maxHeight: .infinity)
     }
 }
 
