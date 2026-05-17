@@ -2,35 +2,38 @@ import SwiftUI
 
 struct RootView: View {
     @EnvironmentObject var store: AppStore
-    @State private var selectedTab: Tab = .goals
-
-    enum Tab: String { case goals, journal, progress }
 
     var body: some View {
-        TabView(selection: $selectedTab) {
+        if !store.profile.hasCompletedOnboarding {
+            OnboardingView()
+        } else {
+            MainTabView()
+        }
+    }
+}
+
+struct MainTabView: View {
+    var body: some View {
+        TabView {
             NavigationStack {
                 GoalsView()
             }
             .tabItem { Label("Goals", systemImage: "scope") }
-            .tag(Tab.goals)
 
             NavigationStack {
                 JournalView()
             }
             .tabItem { Label("Daily Log", systemImage: "text.book.closed") }
-            .tag(Tab.journal)
 
             NavigationStack {
-                GoalProgressScreen()
+                GoalProgressView()
             }
             .tabItem { Label("Progress", systemImage: "chart.line.uptrend.xyaxis") }
-            .tag(Tab.progress)
         }
-        .tint(Color("AccentTeal"))
+        .tint(Color.accentTeal)
     }
 }
 
 #Preview {
-    RootView()
-        .environmentObject(AppStore())
+    RootView().environmentObject(AppStore())
 }

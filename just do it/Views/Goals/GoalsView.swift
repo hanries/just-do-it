@@ -2,129 +2,139 @@ import SwiftUI
 
 struct GoalsView: View {
     @EnvironmentObject var store: AppStore
-    @State private var showingAddGoal = false
 
     var body: some View {
         ZStack(alignment: .bottom) {
-            // Main content
-            Group {
-                if store.goals.isEmpty {
-                    GoalsEmptyState()
-                } else {
-                    List {
+            if store.goals.isEmpty {
+                GoalsEmptyState()
+            } else {
+                ScrollView {
+                    VStack(spacing: 16) {
+                        // Streak banner
+                        if store.currentStreak > 0 {
+                            StreakBanner(streak: store.currentStreak)
+                        }
+
                         ForEach(store.goals) { goal in
                             NavigationLink(destination: GoalDetailView(goal: goal)) {
-                                GoalRowView(goal: goal)
+                                GoalCardView(goal: goal)
                             }
-                            .listRowSeparator(.hidden)
-                            .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
+                            .buttonStyle(.plain)
                         }
-                        .onDelete(perform: store.deleteGoal)
 
-                        // Bottom padding so FAB doesn't cover last row
                         Color.clear.frame(height: 90)
-                            .listRowSeparator(.hidden)
                     }
-                    .listStyle(.plain)
+                    .padding(16)
                 }
             }
-
-            // Floating action button
-            Button {
-                showingAddGoal = true
-            } label: {
-                HStack(spacing: 8) {
-                    Image(systemName: "plus")
-                        .font(.body.weight(.semibold))
-                    Text("New Goal")
-                        .font(.body.weight(.semibold))
-                }
-                .foregroundStyle(.white)
-                .padding(.horizontal, 24)
-                .padding(.vertical, 16)
-                .background(Color.accentTeal)
-                .clipShape(Capsule())
-                .shadow(color: Color.accentTeal.opacity(0.4), radius: 12, x: 0, y: 6)
-            }
-            .padding(.bottom, 24)
         }
         .navigationTitle("Goals")
         .navigationBarTitleDisplayMode(.large)
-        .sheet(isPresented: $showingAddGoal) {
-            AddGoalView()
-        }
     }
 }
 
-// MARK: - Goal Row
+// MARK: - Streak Banner
 
-struct GoalRowView: View {
+struct StreakBanner: View {
+    let streak: Int
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Text("🔥")
+                .font(.title2)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("\(streak) day streak")
+                    .font(.subheadline.weight(.semibold))
+                Text("Keep logging daily to maintain it")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+        }
+        .padding(14)
+        .background(Color.accentTeal.opacity(0.08))
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(Color.accentTeal.opacity(0.2), lineWidth: 1))
+    }
+}
+
+// MARK: - Goal Card
+
+struct GoalCardView: View {
     let goal: Goal
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(goal.text)
-                        .font(.system(.body, design: .serif, weight: .regular))
-                        .foregroundStyle(.primary)
-                        .lineLimit(2)
-
-                    Text("\(goal.timeframeWeeks) weeks · Week \(goal.completedWeeks + 1) of \(goal.weeks.count)")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                Spacer()
-                CircularProgressView(fraction: goal.progressFraction)
-                    .frame(width: 40, height: 40)
+        VStack(alignment: .leading, spacing: 14) {
+            // Goal summary (AI reframe)
+            if !goal.goalSummary.isEmpty {
+                Text(goal.goalSummary)
+                    .font(.system(.body, design: .serif, weight: .regular))
+                    .foregroundStyle(.primary)
+            } else {
+                Text(goal.text)
+                    .font(.system(.body, design: .serif))
+                    .foregroundStyle(.primary)
+                    .lineLimit(2)
             }
 
-            if let current = goal.currentWeek {
-                HStack(spacing: 6) {
-                    RoundedRectangle(cornerRadius: 2)
-                        .fill(Color.accentTeal)
-                        .frame(width: 3, height: 30)
-                    Text(current.goal)
+            // Progress bar
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Text("Milestones")
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                        .lineLimit(2)
+                    Spacer()
+                    Text("\(goal.milestones.filter(\.isComplete).count)/\(goal.milestones.count)")
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(Color.accentTeal)
+                }
+                ProgressView(value: goal.progressFraction)
+                    .tint(Color.accentTeal)
+            }
+
+            // Current milestone
+            if let current = goal.currentMilestone {
+                HStack(spacing: 8) {
+                    Circle()
+                        .fill(Color.accentTeal)
+                        .frame(width: 6, height: 6)
+                    Text("Next: \(current.title)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Text("Week \(current.dueWeek)")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
                 }
             }
         }
-        .padding(14)
+        .padding(16)
         .background(Color(.systemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 14))
-        .overlay(
-            RoundedRectangle(cornerRadius: 14)
-                .strokeBorder(Color(.separator).opacity(0.4), lineWidth: 0.5)
-        )
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(Color(.separator).opacity(0.4), lineWidth: 0.5))
+        .shadow(color: .black.opacity(0.04), radius: 8, x: 0, y: 2)
     }
 }
-
-// MARK: - Empty State
 
 struct GoalsEmptyState: View {
     var body: some View {
         VStack {
             Spacer()
-            
             VStack(spacing: 16) {
                 Image(systemName: "scope")
                     .font(.system(size: 48))
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(.secondary)
                 Text("No goals yet")
                     .font(.headline)
-                Text("Tap the button below to add your first big goal.\nClaude will break it into weekly milestones.")
+                Text("Your plan will appear here after onboarding.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
             }
             .padding(32)
-            
             Spacer()
-            Spacer() // extra spacer pushes content up from FAB
+            Spacer()
         }
-        .frame(maxHeight: .infinity)
     }
 }
 

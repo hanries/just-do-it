@@ -1,16 +1,32 @@
 import SwiftUI
 import Foundation
 import Combine
-
 @MainActor
 class AppStore: ObservableObject {
+    @Published var profile: UserProfile = UserProfile()
     @Published var goals: [Goal] = []
     @Published var entries: [JournalEntry] = []
+    @Published var personalTodos: [PersonalTodo] = []
+    @Published var streakCount: Int = 0
 
-    private let goalsKey = "goalos.goals"
-    private let entriesKey = "goalos.entries"
+    private let profileKey   = "goalos.profile"
+    private let goalsKey     = "goalos.goals"
+    private let entriesKey   = "goalos.entries"
+    private let todosKey     = "goalos.personaltodos"
+    private let streakKey    = "goalos.streak"
+    private let lastActiveKey = "goalos.lastactive"
 
-    init() { load() }
+    init() {
+        load()
+        updateStreak()
+    }
+
+    // MARK: - Profile
+
+    func saveProfile(_ p: UserProfile) {
+        profile = p
+        persist()
+    }
 
     // MARK: - Goals
 
@@ -31,35 +47,75 @@ class AppStore: ObservableObject {
         persist()
     }
 
-    func markWeekComplete(goalId: UUID, weekId: UUID) {
+    // MARK: - Milestone completion
+
+    func completeMilestone(goalId: UUID, milestoneId: UUID) {
         guard let gi = goals.firstIndex(where: { $0.id == goalId }),
-              let wi = goals[gi].weeks.firstIndex(where: { $0.id == weekId }) else { return }
-        goals[gi].weeks[wi].isComplete = true
+              let mi = goals[gi].milestones.firstIndex(where: { $0.id == milestoneId }) else { return }
+        goals[gi].milestones[mi].isComplete = true
+        // Unlock next 2 weeks
+        let nextWeek = goals[gi].currentUnlockedWeek + 2
+        goals[gi].currentUnlockedWeek = min(nextWeek, goals[gi].timeframeWeeks)
+        // Unlock next weekly plan if available
+        for wi in goals[gi].weeklyPlans.indices {
+            if goals[gi].weeklyPlans[wi].week <= goals[gi].currentUnlockedWeek {
+                goals[gi].weeklyPlans[wi].isUnlocked = true
+            }
+        }
         persist()
     }
 
-    // MARK: - Daily Todos
+    // MARK: - Weekly Plan actions
 
-    func addTodo(goalId: UUID, weekId: UUID, text: String) {
+    func toggleAction(goalId: UUID, weekId: UUID, actionId: UUID) {
         guard let gi = goals.firstIndex(where: { $0.id == goalId }),
-              let wi = goals[gi].weeks.firstIndex(where: { $0.id == weekId }) else { return }
-        let todo = DailyTodo(text: text)
-        goals[gi].weeks[wi].dailyTodos.append(todo)
+              let wi = goals[gi].weeklyPlans.firstIndex(where: { $0.id == weekId }),
+              let ai = goals[gi].weeklyPlans[wi].actions.firstIndex(where: { $0.id == actionId }) else { return }
+        goals[gi].weeklyPlans[wi].actions[ai].isComplete.toggle()
         persist()
     }
 
-    func toggleTodo(goalId: UUID, weekId: UUID, todoId: UUID) {
+    func editAction(goalId: UUID, weekId: UUID, actionId: UUID, newText: String) {
         guard let gi = goals.firstIndex(where: { $0.id == goalId }),
-              let wi = goals[gi].weeks.firstIndex(where: { $0.id == weekId }),
-              let ti = goals[gi].weeks[wi].dailyTodos.firstIndex(where: { $0.id == todoId }) else { return }
-        goals[gi].weeks[wi].dailyTodos[ti].isComplete.toggle()
+              let wi = goals[gi].weeklyPlans.firstIndex(where: { $0.id == weekId }),
+              let ai = goals[gi].weeklyPlans[wi].actions.firstIndex(where: { $0.id == actionId }) else { return }
+        goals[gi].weeklyPlans[wi].actions[ai].text = newText
+        goals[gi].weeklyPlans[wi].actions[ai].isEdited = true
         persist()
     }
 
-    func deleteTodo(goalId: UUID, weekId: UUID, todoId: UUID) {
+    func completeWeek(goalId: UUID, weekId: UUID) {
         guard let gi = goals.firstIndex(where: { $0.id == goalId }),
-              let wi = goals[gi].weeks.firstIndex(where: { $0.id == weekId }) else { return }
-        goals[gi].weeks[wi].dailyTodos.removeAll(where: { $0.id == todoId })
+              let wi = goals[gi].weeklyPlans.firstIndex(where: { $0.id == weekId }) else { return }
+        goals[gi].weeklyPlans[wi].isComplete = true
+        persist()
+    }
+
+    // MARK: - Personal Todos
+
+    private var todayKey: String {
+        let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"
+        return f.string(from: Date())
+    }
+
+    var todaysPersonalTodos: [PersonalTodo] {
+        personalTodos.filter { $0.dateKey == todayKey }
+    }
+
+    func addPersonalTodo(text: String) {
+        personalTodos.append(PersonalTodo(text: text, dateKey: todayKey))
+        persist()
+    }
+
+    func togglePersonalTodo(id: UUID) {
+        if let idx = personalTodos.firstIndex(where: { $0.id == id }) {
+            personalTodos[idx].isComplete.toggle()
+            persist()
+        }
+    }
+
+    func deletePersonalTodo(id: UUID) {
+        personalTodos.removeAll(where: { $0.id == id })
         persist()
     }
 
@@ -72,6 +128,7 @@ class AppStore: ObservableObject {
         } else {
             entries.insert(entry, at: 0)
         }
+        updateStreak()
         persist()
     }
 
@@ -83,29 +140,37 @@ class AppStore: ObservableObject {
         entryForDate(date)?.mood
     }
 
-    // MARK: - Stats
+    // MARK: - Streak
 
-    var currentStreak: Int {
+    func updateStreak() {
         var streak = 0
         var checking = Calendar.current.startOfDay(for: Date())
         while entries.contains(where: { Calendar.current.isDate($0.date, inSameDayAs: checking) }) {
             streak += 1
             checking = Calendar.current.date(byAdding: .day, value: -1, to: checking)!
         }
-        return streak
+        streakCount = streak
     }
+
+    var currentStreak: Int { streakCount }
 
     // MARK: - Persistence
 
     private func persist() {
+        if let d = try? JSONEncoder().encode(profile) { UserDefaults.standard.set(d, forKey: profileKey) }
         if let d = try? JSONEncoder().encode(goals) { UserDefaults.standard.set(d, forKey: goalsKey) }
         if let d = try? JSONEncoder().encode(entries) { UserDefaults.standard.set(d, forKey: entriesKey) }
+        if let d = try? JSONEncoder().encode(personalTodos) { UserDefaults.standard.set(d, forKey: todosKey) }
     }
 
     private func load() {
+        if let d = UserDefaults.standard.data(forKey: profileKey),
+           let v = try? JSONDecoder().decode(UserProfile.self, from: d) { profile = v }
         if let d = UserDefaults.standard.data(forKey: goalsKey),
            let v = try? JSONDecoder().decode([Goal].self, from: d) { goals = v }
         if let d = UserDefaults.standard.data(forKey: entriesKey),
            let v = try? JSONDecoder().decode([JournalEntry].self, from: d) { entries = v }
+        if let d = UserDefaults.standard.data(forKey: todosKey),
+           let v = try? JSONDecoder().decode([PersonalTodo].self, from: d) { personalTodos = v }
     }
 }

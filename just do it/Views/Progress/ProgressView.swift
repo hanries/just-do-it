@@ -1,6 +1,6 @@
 import SwiftUI
 
-struct GoalProgressScreen: View {
+struct GoalProgressView: View {
     @EnvironmentObject var store: AppStore
 
     var body: some View {
@@ -133,7 +133,7 @@ struct MoodCalendarView: View {
                 ForEach(dayLabels, id: \.self) { d in
                     Text(d)
                         .font(.caption2)
-                        .foregroundStyle(.tertiary)
+                        .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity)
                 }
             }
@@ -172,7 +172,7 @@ struct CalendarDayCell: View {
     var body: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 6)
-                .fill(mood != nil ? Color(mood!.color).opacity(0.25) : Color(.tertiarySystemBackground))
+                .fill(mood != nil ? Color(mood!.color).opacity(0.25) : Color(.secondarySystemBackground))
 
             if isToday {
                 RoundedRectangle(cornerRadius: 6)
@@ -181,7 +181,7 @@ struct CalendarDayCell: View {
 
             Text("\(day)")
                 .font(.system(size: 11, weight: isToday ? .semibold : .regular))
-                .foregroundStyle(mood != nil ? Color(mood!.color) : (isToday ? Color.primary : Color.secondary))
+                .foregroundStyle(mood != nil ? Color(mood!.color) : (isToday ? .primary : .secondary))
         }
         .aspectRatio(1, contentMode: .fill)
     }
@@ -201,7 +201,7 @@ struct GoalProgressRow: View {
 
                 GeometryReader { geo in
                     ZStack(alignment: .leading) {
-                        Capsule().fill(Color(.tertiarySystemBackground)).frame(height: 4)
+                        Capsule().fill(Color(.secondarySystemBackground)).frame(height: 4)
                         Capsule()
                             .fill(Color("AccentTeal"))
                             .frame(width: geo.size.width * goal.progressFraction, height: 4)
@@ -221,6 +221,6 @@ struct GoalProgressRow: View {
 }
 
 #Preview {
-    NavigationStack { GoalProgressScreen() }
+    NavigationStack { GoalProgressView() }
         .environmentObject(AppStore())
 }

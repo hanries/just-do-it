@@ -1,37 +1,88 @@
 import Foundation
 
+// MARK: - Onboarding Profile
+
+struct UserProfile: Codable {
+    var hasCompletedOnboarding: Bool = false
+    var currentSituation: String = ""
+    var biggestObstacle: String = ""
+    var hoursPerWeek: Double = 3.0
+}
+
 // MARK: - Goal
 
 struct Goal: Identifiable, Codable {
     var id: UUID = UUID()
     var text: String
+    var goalSummary: String = ""        // AI reframe
     var timeframeWeeks: Int
     var createdAt: Date = Date()
-    var weeks: [WeekMilestone] = []
+    var milestones: [Milestone] = []
+    var weeklyPlans: [WeeklyPlan] = []
+    var currentUnlockedWeek: Int = 1    // only show up to this week
 
-    var completedWeeks: Int { weeks.filter(\.isComplete).count }
-    var progressFraction: Double {
-        guard !weeks.isEmpty else { return 0 }
-        return Double(completedWeeks) / Double(weeks.count)
+    var currentMilestone: Milestone? {
+        milestones.first(where: { !$0.isComplete })
     }
-    var currentWeek: WeekMilestone? { weeks.first(where: { !$0.isComplete }) }
+    var progressFraction: Double {
+        guard !milestones.isEmpty else { return 0 }
+        let done = milestones.filter(\.isComplete).count
+        return Double(done) / Double(milestones.count)
+    }
 }
 
-struct WeekMilestone: Identifiable, Codable {
+// MARK: - Milestone (meaningful checkpoint)
+
+struct Milestone: Identifiable, Codable {
     var id: UUID = UUID()
-    var weekNumber: Int
-    var goal: String            // AI-generated short milestone summary
-    var tasks: [String] = []    // AI-generated suggested tasks
-    var dailyTodos: [DailyTodo] = []  // user-created personal todos
+    var milestoneNumber: Int
+    var title: String
+    var description: String             // "By now you can X"
+    var dueWeek: Int
     var isComplete: Bool = false
 }
 
-// User-created daily to-do item within a week
+// MARK: - Weekly Plan
+
+struct WeeklyPlan: Identifiable, Codable {
+    var id: UUID = UUID()
+    var week: Int
+    var theme: String                   // e.g. "Foundation"
+    var focus: String                   // one sentence
+    var actions: [ActionItem]
+    var checkpoint: String              // how the user knows they succeeded
+    var isUnlocked: Bool = false
+    var isComplete: Bool = false
+
+    // User-created personal todos on top of AI actions
+    var personalTodos: [DailyTodo] = []
+}
+
+// MARK: - Action Item (AI-generated, user-editable)
+
+struct ActionItem: Identifiable, Codable {
+    var id: UUID = UUID()
+    var text: String
+    var isComplete: Bool = false
+    var isEdited: Bool = false          // track if user modified it
+}
+
+// MARK: - Daily Todo (user-created)
+
 struct DailyTodo: Identifiable, Codable {
     var id: UUID = UUID()
     var text: String
     var isComplete: Bool = false
     var createdAt: Date = Date()
+}
+
+// MARK: - Personal Todo (Daily Log, resets daily)
+
+struct PersonalTodo: Identifiable, Codable {
+    var id: UUID = UUID()
+    var text: String
+    var isComplete: Bool = false
+    var dateKey: String
 }
 
 // MARK: - Journal Entry
@@ -48,6 +99,8 @@ struct JournalEntry: Identifiable, Codable {
     }
 }
 
+// MARK: - Mood
+
 enum Mood: String, Codable, CaseIterable {
     case great, good, okay, rough
 
@@ -59,7 +112,6 @@ enum Mood: String, Codable, CaseIterable {
         case .rough: return "Rough"
         }
     }
-
     var emoji: String {
         switch self {
         case .great: return "🌱"
@@ -68,7 +120,6 @@ enum Mood: String, Codable, CaseIterable {
         case .rough: return "🌧"
         }
     }
-
     var color: String {
         switch self {
         case .great: return "MoodTeal"

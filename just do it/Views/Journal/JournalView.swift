@@ -5,6 +5,8 @@ struct JournalView: View {
     @State private var selectedMood: Mood?
     @State private var journalText = ""
     @State private var checkedTasks: Set<String> = []
+    @State private var newPersonalTodo = ""
+    @FocusState private var personalTodoFocused: Bool
 
     private var today: Date { Calendar.current.startOfDay(for: Date()) }
     private var existingEntry: JournalEntry? { store.entryForDate(today) }
@@ -12,9 +14,9 @@ struct JournalView: View {
     private var currentTasks: [(key: String, label: String)] {
         var result: [(key: String, label: String)] = []
         for goal in store.goals {
-            guard let week = goal.currentWeek else { continue }
-            for (i, task) in week.tasks.prefix(3).enumerated() {
-                result.append((key: "\(goal.id)-\(week.id)-\(i)", label: task))
+            guard let plan = goal.weeklyPlans.first(where: { $0.isUnlocked && !$0.isComplete }) else { continue }
+            for (i, action) in plan.actions.prefix(3).enumerated() {
+                result.append((key: "\(goal.id)-\(plan.id)-\(i)", label: action.text))
             }
         }
         return Array(result.prefix(6))
@@ -48,7 +50,7 @@ struct JournalView: View {
                     }
                 }
 
-                // Task checklist (only shown if goals exist)
+                // Goal task checklist
                 if !currentTasks.isEmpty {
                     VStack(alignment: .leading, spacing: 10) {
                         Label("This week's tasks", systemImage: "checklist")
@@ -78,7 +80,70 @@ struct JournalView: View {
                     }
                 }
 
-                // Journal text
+                // ── Personal to-do list ──────────────────────────────────
+                VStack(alignment: .leading, spacing: 10) {
+                    Label("Today's to-dos", systemImage: "list.bullet")
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(.secondary)
+
+                    // Add input row
+                    HStack(spacing: 10) {
+                        TextField("Add a task…", text: $newPersonalTodo)
+                            .font(.subheadline)
+                            .focused($personalTodoFocused)
+                            .onSubmit { addPersonalTodo() }
+
+                        Button(action: addPersonalTodo) {
+                            Image(systemName: "plus.circle.fill")
+                                .font(.title3)
+                                .foregroundStyle(
+                                    newPersonalTodo.trimmingCharacters(in: .whitespaces).isEmpty
+                                        ? Color(.secondaryLabel)
+                                        : Color.accentTeal
+                                )
+                        }
+                        .disabled(newPersonalTodo.trimmingCharacters(in: .whitespaces).isEmpty)
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 12)
+                    .background(Color(.systemBackground))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .strokeBorder(
+                                personalTodoFocused ? Color.accentTeal : Color(.separator).opacity(0.4),
+                                lineWidth: personalTodoFocused ? 1.5 : 0.5
+                            )
+                    )
+
+                    // Todo items
+                    if !store.todaysPersonalTodos.isEmpty {
+                        VStack(spacing: 0) {
+                            ForEach(store.todaysPersonalTodos) { todo in
+                                PersonalTodoRow(todo: todo)
+
+                                if todo.id != store.todaysPersonalTodos.last?.id {
+                                    Divider().padding(.leading, 46)
+                                }
+                            }
+                        }
+                        .background(Color(.systemBackground))
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 14)
+                                .strokeBorder(Color(.separator).opacity(0.4), lineWidth: 0.5)
+                        )
+                    } else {
+                        Text("No tasks yet — add something above")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 16)
+                    }
+                }
+                // ────────────────────────────────────────────────────────
+
+                // Reflection
                 VStack(alignment: .leading, spacing: 10) {
                     Label("Reflection", systemImage: "text.alignleft")
                         .font(.subheadline.weight(.medium))
@@ -98,7 +163,7 @@ struct JournalView: View {
                             if journalText.isEmpty {
                                 Text("What did you work on? Any wins, blockers, reflections…")
                                     .font(.system(.body, design: .serif))
-                                    .foregroundStyle(.tertiary)
+                                    .foregroundStyle(.secondary)
                                     .padding(.top, 20)
                                     .padding(.leading, 16)
                                     .allowsHitTesting(false)
@@ -112,7 +177,7 @@ struct JournalView: View {
                         .font(.body.weight(.medium))
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 14)
-                        .background(Color("AccentTeal"))
+                        .background(Color.accentTeal)
                         .foregroundStyle(.white)
                         .clipShape(RoundedRectangle(cornerRadius: 14))
                 }
@@ -137,6 +202,8 @@ struct JournalView: View {
         .onAppear(perform: loadExistingEntry)
     }
 
+    // MARK: - Helpers
+
     private func loadExistingEntry() {
         if let entry = existingEntry {
             selectedMood = entry.mood
@@ -151,6 +218,50 @@ struct JournalView: View {
         entry.completedTaskKeys = checkedTasks
         store.saveEntry(entry)
         UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+    }
+
+    private func addPersonalTodo() {
+        let text = newPersonalTodo.trimmingCharacters(in: .whitespaces)
+        guard !text.isEmpty else { return }
+        store.addPersonalTodo(text: text)
+        newPersonalTodo = ""
+    }
+}
+
+// MARK: - Personal Todo Row
+
+struct PersonalTodoRow: View {
+    @EnvironmentObject var store: AppStore
+    let todo: PersonalTodo
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Button {
+                store.togglePersonalTodo(id: todo.id)
+            } label: {
+                Image(systemName: todo.isComplete ? "checkmark.circle.fill" : "circle")
+                    .font(.title3)
+                    .foregroundStyle(todo.isComplete ? Color.accentTeal : Color(.secondaryLabel))
+            }
+            .buttonStyle(.plain)
+
+            Text(todo.text)
+                .font(.subheadline)
+                .foregroundStyle(todo.isComplete ? .secondary : .primary)
+                .strikethrough(todo.isComplete)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            Button {
+                store.deletePersonalTodo(id: todo.id)
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.caption)
+                    .foregroundStyle(Color(.secondaryLabel))
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
     }
 }
 
@@ -195,8 +306,7 @@ struct TaskCheckRow: View {
             HStack(spacing: 12) {
                 Image(systemName: isChecked ? "checkmark.circle.fill" : "circle")
                     .font(.title3)
-                    .foregroundStyle(isChecked ? Color("AccentTeal") : Color.secondary)
-
+                    .foregroundStyle(isChecked ? Color.accentTeal : Color(.secondaryLabel))
 
                 Text(label)
                     .font(.subheadline)
@@ -230,7 +340,7 @@ struct PastEntryRow: View {
                 Spacer()
                 Text(entry.date, format: .dateTime.month(.abbreviated).day())
                     .font(.caption)
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(.secondary)
             }
             if !entry.text.isEmpty {
                 Text(entry.text)

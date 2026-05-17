@@ -1,97 +1,119 @@
 import SwiftUI
 
-// MARK: - Week Detail: weekly goal + AI tasks + user todos
-
 struct WeekDetailView: View {
     @EnvironmentObject var store: AppStore
-    let week: WeekMilestone
-    let weekIndex: Int
+    let plan: WeeklyPlan
     let goalId: UUID
 
     @State private var newTodoText = ""
-    @FocusState private var todoFieldFocused: Bool
+    @State private var editingActionId: UUID? = nil
+    @State private var editingText = ""
+    @FocusState private var todoFocused: Bool
+    @FocusState private var editFocused: Bool
 
-    private var liveWeek: WeekMilestone? {
+    private var livePlan: WeeklyPlan? {
         store.goals.first(where: { $0.id == goalId })?
-            .weeks.first(where: { $0.id == week.id })
+            .weeklyPlans.first(where: { $0.id == plan.id })
     }
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
 
-                // Weekly goal banner
+                // Theme + Focus
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Week \(weekIndex + 1) goal")
-                        .font(.caption.weight(.medium))
-                        .foregroundStyle(.secondary)
+                    Text(livePlan?.theme ?? plan.theme)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(Color.accentTeal)
                         .textCase(.uppercase)
-                        .tracking(0.5)
-                    Text(liveWeek?.goal ?? week.goal)
+                        .tracking(0.8)
+                    Text(livePlan?.focus ?? plan.focus)
                         .font(.system(.title3, design: .serif, weight: .regular))
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(16)
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .background(Color.accentTeal.opacity(0.08))
                 .clipShape(RoundedRectangle(cornerRadius: 14))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 14)
-                        .strokeBorder(Color.accentTeal.opacity(0.2), lineWidth: 1)
-                )
+                .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(Color.accentTeal.opacity(0.2), lineWidth: 1))
 
-                // AI-suggested tasks
-                if !(liveWeek?.tasks ?? week.tasks).isEmpty {
-                    VStack(alignment: .leading, spacing: 10) {
-                        Label("Suggested focus areas", systemImage: "sparkles")
+                // AI Actions (editable)
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack {
+                        Label("This week's actions", systemImage: "sparkles")
                             .font(.subheadline.weight(.medium))
                             .foregroundStyle(.secondary)
+                        Spacer()
+                        Text("Tap to edit")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
 
-                        VStack(spacing: 0) {
-                            ForEach((liveWeek?.tasks ?? week.tasks), id: \.self) { task in
-                                HStack(alignment: .top, spacing: 10) {
-                                    Image(systemName: "arrow.right.circle.fill")
-                                        .font(.caption)
-                                        .foregroundStyle(Color.accentTeal.opacity(0.7))
-                                        .padding(.top, 2)
-                                    Text(task)
+                    VStack(spacing: 0) {
+                        ForEach(livePlan?.actions ?? plan.actions) { action in
+                            if editingActionId == action.id {
+                                // Inline edit mode
+                                HStack(spacing: 10) {
+                                    TextField("Edit action…", text: $editingText)
                                         .font(.subheadline)
-                                        .foregroundStyle(.primary)
-                                    Spacer()
+                                        .focused($editFocused)
+                                    Button("Done") {
+                                        store.editAction(goalId: goalId, weekId: plan.id,
+                                                         actionId: action.id, newText: editingText)
+                                        editingActionId = nil
+                                    }
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(Color.accentTeal)
                                 }
                                 .padding(.horizontal, 14)
-                                .padding(.vertical, 10)
-
-                                if task != (liveWeek?.tasks ?? week.tasks).last {
-                                    Divider().padding(.leading, 38)
+                                .padding(.vertical, 12)
+                            } else {
+                                ActionRow(action: action, goalId: goalId, weekId: plan.id) {
+                                    editingActionId = action.id
+                                    editingText = action.text
+                                    editFocused = true
                                 }
                             }
+
+                            if action.id != (livePlan?.actions ?? plan.actions).last?.id {
+                                Divider().padding(.leading, 46)
+                            }
                         }
-                        .background(Color(.systemBackground))
-                        .clipShape(RoundedRectangle(cornerRadius: 14))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 14)
-                                .strokeBorder(Color(.separator).opacity(0.4), lineWidth: 0.5)
-                        )
                     }
+                    .background(Color(.systemBackground))
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                    .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(Color(.separator).opacity(0.4), lineWidth: 0.5))
                 }
 
-                // Daily to-do list
+                // Checkpoint
+                VStack(alignment: .leading, spacing: 6) {
+                    Label("How you'll know you succeeded", systemImage: "flag")
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(.secondary)
+                    Text(livePlan?.checkpoint ?? plan.checkpoint)
+                        .font(.subheadline)
+                        .foregroundStyle(.primary)
+                        .padding(14)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Color(.secondarySystemBackground))
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                }
+
+                // Personal Todos
                 VStack(alignment: .leading, spacing: 10) {
-                    Label("My to-do list", systemImage: "checklist")
+                    Label("My personal tasks", systemImage: "list.bullet")
                         .font(.subheadline.weight(.medium))
                         .foregroundStyle(.secondary)
 
-                    // Add todo input
                     HStack(spacing: 10) {
-                        TextField("Add a task…", text: $newTodoText)
+                        TextField("Add your own task…", text: $newTodoText)
                             .font(.subheadline)
-                            .focused($todoFieldFocused)
+                            .focused($todoFocused)
                             .onSubmit { addTodo() }
 
                         Button(action: addTodo) {
                             Image(systemName: "plus.circle.fill")
                                 .font(.title3)
-                                .foregroundStyle(newTodoText.isEmpty ? Color(.tertiaryLabel) : Color.accentTeal)
+                                .foregroundStyle(newTodoText.isEmpty ? Color(.secondaryLabel) : Color.accentTeal)
                         }
                         .disabled(newTodoText.trimmingCharacters(in: .whitespaces).isEmpty)
                     }
@@ -99,41 +121,33 @@ struct WeekDetailView: View {
                     .padding(.vertical, 12)
                     .background(Color(.systemBackground))
                     .clipShape(RoundedRectangle(cornerRadius: 12))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .strokeBorder(todoFieldFocused ? Color.accentTeal : Color(.separator).opacity(0.4),
-                                          lineWidth: todoFieldFocused ? 1.5 : 0.5)
-                    )
+                    .overlay(RoundedRectangle(cornerRadius: 12)
+                        .strokeBorder(todoFocused ? Color.accentTeal : Color(.separator).opacity(0.4),
+                                      lineWidth: todoFocused ? 1.5 : 0.5))
 
-                    // Todo items
-                    if let todos = liveWeek?.dailyTodos, !todos.isEmpty {
+                    if let todos = livePlan?.personalTodos, !todos.isEmpty {
                         VStack(spacing: 0) {
                             ForEach(todos) { todo in
-                                TodoRowView(todo: todo, goalId: goalId, weekId: week.id)
-                                if todo.id != todos.last?.id {
-                                    Divider().padding(.leading, 46)
-                                }
+                                WeekTodoRow(todo: todo, goalId: goalId, weekId: plan.id)
+                                if todo.id != todos.last?.id { Divider().padding(.leading, 46) }
                             }
                         }
                         .background(Color(.systemBackground))
                         .clipShape(RoundedRectangle(cornerRadius: 14))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 14)
-                                .strokeBorder(Color(.separator).opacity(0.4), lineWidth: 0.5)
-                        )
+                        .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(Color(.separator).opacity(0.4), lineWidth: 0.5))
                     } else {
-                        Text("No tasks yet — add something above")
+                        Text("Add tasks that are specific to your situation")
                             .font(.subheadline)
-                            .foregroundStyle(.tertiary)
+                            .foregroundStyle(.secondary)
                             .frame(maxWidth: .infinity)
-                            .padding(.vertical, 20)
+                            .padding(.vertical, 16)
                     }
                 }
 
-                // Mark week complete
-                if !(liveWeek?.isComplete ?? week.isComplete) {
+                // Complete week button
+                if !(livePlan?.isComplete ?? plan.isComplete) {
                     Button {
-                        store.markWeekComplete(goalId: goalId, weekId: week.id)
+                        store.completeWeek(goalId: goalId, weekId: plan.id)
                     } label: {
                         Label("Mark week complete", systemImage: "checkmark.circle.fill")
                             .font(.body.weight(.medium))
@@ -155,21 +169,63 @@ struct WeekDetailView: View {
             }
             .padding(16)
         }
-        .navigationTitle("Week \(weekIndex + 1)")
+        .navigationTitle("Week \(plan.week)")
         .navigationBarTitleDisplayMode(.inline)
     }
 
     private func addTodo() {
         let text = newTodoText.trimmingCharacters(in: .whitespaces)
         guard !text.isEmpty else { return }
-        store.addTodo(goalId: goalId, weekId: week.id, text: text)
+        // Add personal todo to this week plan
+        guard let gi = store.goals.firstIndex(where: { $0.id == goalId }),
+              let wi = store.goals[gi].weeklyPlans.firstIndex(where: { $0.id == plan.id }) else { return }
+        store.goals[gi].weeklyPlans[wi].personalTodos.append(DailyTodo(text: text))
+        store.updateGoal(store.goals[gi])
         newTodoText = ""
     }
 }
 
-// MARK: - Todo Row
+// MARK: - Action Row (editable)
 
-struct TodoRowView: View {
+struct ActionRow: View {
+    @EnvironmentObject var store: AppStore
+    let action: ActionItem
+    let goalId: UUID
+    let weekId: UUID
+    let onEdit: () -> Void
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Button {
+                store.toggleAction(goalId: goalId, weekId: weekId, actionId: action.id)
+            } label: {
+                Image(systemName: action.isComplete ? "checkmark.circle.fill" : "circle")
+                    .font(.title3)
+                    .foregroundStyle(action.isComplete ? Color.accentTeal : Color(.secondaryLabel))
+            }
+            .buttonStyle(.plain)
+
+            Text(action.text)
+                .font(.subheadline)
+                .foregroundStyle(action.isComplete ? .secondary : .primary)
+                .strikethrough(action.isComplete)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            Button(action: onEdit) {
+                Image(systemName: "pencil")
+                    .font(.caption)
+                    .foregroundStyle(action.isEdited ? Color.accentTeal : Color(.secondaryLabel))
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+    }
+}
+
+// MARK: - Personal Todo Row
+
+struct WeekTodoRow: View {
     @EnvironmentObject var store: AppStore
     let todo: DailyTodo
     let goalId: UUID
@@ -178,11 +234,15 @@ struct TodoRowView: View {
     var body: some View {
         HStack(spacing: 12) {
             Button {
-                store.toggleTodo(goalId: goalId, weekId: weekId, todoId: todo.id)
+                guard let gi = store.goals.firstIndex(where: { $0.id == goalId }),
+                      let wi = store.goals[gi].weeklyPlans.firstIndex(where: { $0.id == weekId }),
+                      let ti = store.goals[gi].weeklyPlans[wi].personalTodos.firstIndex(where: { $0.id == todo.id }) else { return }
+                store.goals[gi].weeklyPlans[wi].personalTodos[ti].isComplete.toggle()
+                store.updateGoal(store.goals[gi])
             } label: {
                 Image(systemName: todo.isComplete ? "checkmark.circle.fill" : "circle")
                     .font(.title3)
-                    .foregroundStyle(todo.isComplete ? Color.accentTeal : Color(.tertiaryLabel))
+                    .foregroundStyle(todo.isComplete ? Color.accentTeal : Color(.secondaryLabel))
             }
             .buttonStyle(.plain)
 
@@ -193,11 +253,14 @@ struct TodoRowView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
 
             Button {
-                store.deleteTodo(goalId: goalId, weekId: weekId, todoId: todo.id)
+                guard let gi = store.goals.firstIndex(where: { $0.id == goalId }),
+                      let wi = store.goals[gi].weeklyPlans.firstIndex(where: { $0.id == weekId }) else { return }
+                store.goals[gi].weeklyPlans[wi].personalTodos.removeAll(where: { $0.id == todo.id })
+                store.updateGoal(store.goals[gi])
             } label: {
                 Image(systemName: "xmark")
                     .font(.caption)
-                    .foregroundStyle(Color(.tertiaryLabel))
+                    .foregroundStyle(Color(.secondaryLabel))
             }
             .buttonStyle(.plain)
         }
@@ -209,8 +272,9 @@ struct TodoRowView: View {
 #Preview {
     NavigationStack {
         WeekDetailView(
-            week: WeekMilestone(weekNumber: 1, goal: "Research GT transfer requirements", tasks: ["Review admission page", "Email academic advisor", "List required courses"]),
-            weekIndex: 0,
+            plan: WeeklyPlan(week: 1, theme: "Foundation", focus: "Build the habit before optimizing it.",
+                             actions: [ActionItem(text: "Train 3x this week"), ActionItem(text: "Hit protein goal daily")],
+                             checkpoint: "You completed 3 sessions", isUnlocked: true),
             goalId: UUID()
         )
     }
