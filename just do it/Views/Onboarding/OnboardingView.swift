@@ -4,7 +4,6 @@ struct OnboardingView: View {
     @EnvironmentObject var store: AppStore
     @State private var currentPage = 0
 
-    // User inputs
     @State private var goalText = ""
     @State private var timeframeWeeks = 8
     @State private var currentSituation = ""
@@ -24,13 +23,13 @@ struct OnboardingView: View {
                 HStack(spacing: 8) {
                     ForEach(0..<5) { i in
                         Capsule()
-                            .fill(i <= currentPage ? Color.accentTeal : Color(.secondarySystemFill))
+                            .fill(i <= currentPage ? Color.accentTeal : Color(.tertiarySystemFill))
                             .frame(width: i == currentPage ? 24 : 8, height: 8)
                             .animation(.easeInOut(duration: 0.25), value: currentPage)
                     }
                 }
-                .padding(.top, 60)
-                .padding(.bottom, 40)
+                .padding(.top, 56)
+                .padding(.bottom, 20)
 
                 // Pages
                 TabView(selection: $currentPage) {
@@ -55,6 +54,7 @@ struct OnboardingView: View {
                 }
                 .tabViewStyle(.page(indexDisplayMode: .never))
                 .animation(.easeInOut, value: currentPage)
+                .frame(maxHeight: .infinity)
 
                 // Navigation buttons
                 HStack(spacing: 16) {
@@ -84,8 +84,8 @@ struct OnboardingView: View {
                             .font(.body.weight(.semibold))
                             .foregroundStyle(.white)
                             .padding(.horizontal, 32)
-                            .padding(.vertical, 16)
-                            .background(canAdvance ? Color.accentTeal : Color(.secondarySystemFill))
+                            .padding(.vertical, 14)
+                            .background(canAdvance ? Color.accentTeal : Color(.tertiarySystemFill))
                             .clipShape(Capsule())
                         }
                         .disabled(!canAdvance)
@@ -104,7 +104,7 @@ struct OnboardingView: View {
                             .font(.body.weight(.semibold))
                             .foregroundStyle(.white)
                             .padding(.horizontal, 32)
-                            .padding(.vertical, 16)
+                            .padding(.vertical, 14)
                             .background(Color.accentTeal)
                             .clipShape(Capsule())
                         }
@@ -112,8 +112,12 @@ struct OnboardingView: View {
                     }
                 }
                 .padding(.horizontal, 24)
-                .padding(.bottom, 48)
+                .padding(.top, 12)
+                .padding(.bottom, 32)
             }
+        }
+        .onTapGesture {
+            UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
         }
     }
 
@@ -130,7 +134,6 @@ struct OnboardingView: View {
         isLoading = true
         errorMessage = nil
         do {
-            // Swap breakdownGoalMock → breakdownGoal when using real API
             let response = try await AIService.shared.breakdownGoalMock(
                 goal: goalText,
                 timelineWeeks: timeframeWeeks,
@@ -146,13 +149,12 @@ struct OnboardingView: View {
             }
 
             goal.weeklyPlans = response.weeklyPlans.map { w in
-                var plan = WeeklyPlan(
+                WeeklyPlan(
                     week: w.week, theme: w.theme, focus: w.focus,
                     actions: w.actions.map { ActionItem(text: $0) },
                     checkpoint: w.checkpoint,
-                    isUnlocked: true   // first 2 weeks always unlocked
+                    isUnlocked: true
                 )
-                return plan
             }
 
             goal.currentUnlockedWeek = 2
@@ -181,49 +183,53 @@ struct GoalPage: View {
     @FocusState private var focused: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 28) {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("What's your goal?")
-                    .font(.system(.largeTitle, design: .serif, weight: .regular))
-                Text("Be specific. The clearer you are, the better your plan.")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-            }
+        ScrollView {
+            VStack(alignment: .leading, spacing: 24) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("What's your goal?")
+                        .font(.system(.title, design: .serif, weight: .regular))
+                    Text("Be specific. The clearer you are, the better your plan.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
 
-            VStack(alignment: .leading, spacing: 12) {
-                TextField("e.g. Gain 10 lbs of muscle in 10 weeks…", text: $goalText, axis: .vertical)
-                    .font(.system(.body, design: .serif))
-                    .lineLimit(3...5)
-                    .focused($focused)
-                    .padding(14)
-                    .background(Color(.secondarySystemBackground))
-                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                VStack(alignment: .leading, spacing: 12) {
+                    TextField("e.g. Gain 10 lbs of muscle in 10 weeks…", text: $goalText, axis: .vertical)
+                        .font(.system(.body, design: .serif))
+                        .lineLimit(3...5)
+                        .focused($focused)
+                        .padding(14)
+                        .background(Color(.secondarySystemBackground))
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
 
-                Text("Timeline")
-                    .font(.subheadline.weight(.medium))
-                    .foregroundStyle(.secondary)
+                    Text("Timeline")
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(.secondary)
 
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        ForEach(timeframes, id: \.self) { w in
-                            Button {
-                                timeframeWeeks = w
-                            } label: {
-                                Text("\(w)w")
-                                    .font(.subheadline.weight(.medium))
-                                    .padding(.horizontal, 16)
-                                    .padding(.vertical, 10)
-                                    .background(timeframeWeeks == w ? Color.accentTeal : Color(.secondarySystemBackground))
-                                    .foregroundStyle(timeframeWeeks == w ? .white : .primary)
-                                    .clipShape(Capsule())
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(timeframes, id: \.self) { w in
+                                Button {
+                                    timeframeWeeks = w
+                                } label: {
+                                    Text("\(w)w")
+                                        .font(.subheadline.weight(.medium))
+                                        .padding(.horizontal, 16)
+                                        .padding(.vertical, 10)
+                                        .background(timeframeWeeks == w ? Color.accentTeal : Color(.secondarySystemBackground))
+                                        .foregroundStyle(timeframeWeeks == w ? .white : .primary)
+                                        .clipShape(Capsule())
+                                }
                             }
                         }
                     }
                 }
             }
-            Spacer()
+            .padding(.horizontal, 28)
+            .padding(.top, 8)
+            .padding(.bottom, 40)
         }
-        .padding(.horizontal, 28)
+        .scrollDismissesKeyboard(.interactively)
         .onAppear { focused = true }
     }
 }
@@ -235,26 +241,29 @@ struct SituationPage: View {
     @FocusState private var focused: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 28) {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Where are you starting from?")
-                    .font(.system(.largeTitle, design: .serif, weight: .regular))
-                Text("Tell us about your current situation so we can personalize your plan.")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 24) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Where are you starting from?")
+                        .font(.system(.title, design: .serif, weight: .regular))
+                    Text("Tell us about your current situation so we can personalize your plan.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+
+                TextField("e.g. I've never trained consistently before, I'm a beginner…", text: $currentSituation, axis: .vertical)
+                    .font(.system(.body, design: .serif))
+                    .lineLimit(4...6)
+                    .focused($focused)
+                    .padding(14)
+                    .background(Color(.secondarySystemBackground))
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
             }
-
-            TextField("e.g. I've never trained consistently before, I'm a beginner…", text: $currentSituation, axis: .vertical)
-                .font(.system(.body, design: .serif))
-                .lineLimit(4...6)
-                .focused($focused)
-                .padding(14)
-                .background(Color(.secondarySystemBackground))
-                .clipShape(RoundedRectangle(cornerRadius: 14))
-
-            Spacer()
+            .padding(.horizontal, 28)
+            .padding(.top, 8)
+            .padding(.bottom, 40)
         }
-        .padding(.horizontal, 28)
+        .scrollDismissesKeyboard(.interactively)
         .onAppear { focused = true }
     }
 }
@@ -268,46 +277,48 @@ struct ObstaclePage: View {
     let examples = ["No time", "Lack of motivation", "Not sure where to start", "Past failures"]
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 28) {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("What's your biggest obstacle?")
-                    .font(.system(.largeTitle, design: .serif, weight: .regular))
-                Text("Be honest. We'll build your plan around it.")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-            }
-
-            VStack(alignment: .leading, spacing: 12) {
-                // Quick pick chips
-                FlowLayout(spacing: 8) {
-                    ForEach(examples, id: \.self) { ex in
-                        Button {
-                            biggestObstacle = ex
-                        } label: {
-                            Text(ex)
-                                .font(.subheadline)
-                                .padding(.horizontal, 14)
-                                .padding(.vertical, 8)
-                                .background(biggestObstacle == ex ? Color.accentTeal.opacity(0.15) : Color(.secondarySystemBackground))
-                                .foregroundStyle(biggestObstacle == ex ? Color.accentTeal : .primary)
-                                .clipShape(Capsule())
-                                .overlay(Capsule().strokeBorder(biggestObstacle == ex ? Color.accentTeal : Color.clear, lineWidth: 1.5))
-                        }
-                    }
+        ScrollView {
+            VStack(alignment: .leading, spacing: 24) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("What's your biggest obstacle?")
+                        .font(.system(.title, design: .serif, weight: .regular))
+                    Text("Be honest. We'll build your plan around it.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
                 }
 
-                TextField("Or describe your own…", text: $biggestObstacle, axis: .vertical)
-                    .font(.system(.body, design: .serif))
-                    .lineLimit(2...4)
-                    .focused($focused)
-                    .padding(14)
-                    .background(Color(.secondarySystemBackground))
-                    .clipShape(RoundedRectangle(cornerRadius: 14))
-            }
+                VStack(alignment: .leading, spacing: 12) {
+                    FlowLayout(spacing: 8) {
+                        ForEach(examples, id: \.self) { ex in
+                            Button {
+                                biggestObstacle = ex
+                            } label: {
+                                Text(ex)
+                                    .font(.subheadline)
+                                    .padding(.horizontal, 14)
+                                    .padding(.vertical, 8)
+                                    .background(biggestObstacle == ex ? Color.accentTeal.opacity(0.15) : Color(.secondarySystemBackground))
+                                    .foregroundStyle(biggestObstacle == ex ? Color.accentTeal : .primary)
+                                    .clipShape(Capsule())
+                                    .overlay(Capsule().strokeBorder(biggestObstacle == ex ? Color.accentTeal : Color.clear, lineWidth: 1.5))
+                            }
+                        }
+                    }
 
-            Spacer()
+                    TextField("Or describe your own…", text: $biggestObstacle, axis: .vertical)
+                        .font(.system(.body, design: .serif))
+                        .lineLimit(2...4)
+                        .focused($focused)
+                        .padding(14)
+                        .background(Color(.secondarySystemBackground))
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                }
+            }
+            .padding(.horizontal, 28)
+            .padding(.top, 8)
+            .padding(.bottom, 40)
         }
-        .padding(.horizontal, 28)
+        .scrollDismissesKeyboard(.interactively)
     }
 }
 
@@ -317,37 +328,39 @@ struct CommitmentPage: View {
     @Binding var hoursPerWeek: Double
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 28) {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("How many hours per week can you commit?")
-                    .font(.system(.largeTitle, design: .serif, weight: .regular))
-                Text("Be realistic — we'll keep your plan within this budget.")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-            }
-
-            VStack(spacing: 20) {
-                Text(String(format: "%.1f", hoursPerWeek) + " hrs / week")
-                    .font(.system(size: 48, design: .serif))
-                    .foregroundStyle(Color.accentTeal)
-                    .frame(maxWidth: .infinity)
-
-                Slider(value: $hoursPerWeek, in: 1...20, step: 0.5)
-                    .tint(Color.accentTeal)
-
-                HStack {
-                    Text("1 hr").font(.caption).foregroundStyle(.secondary)
-                    Spacer()
-                    Text("20 hrs").font(.caption).foregroundStyle(.secondary)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 24) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("How many hours per week can you commit?")
+                        .font(.system(.title, design: .serif, weight: .regular))
+                    Text("Be realistic — we'll keep your plan within this budget.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
                 }
-            }
-            .padding(20)
-            .background(Color(.secondarySystemBackground))
-            .clipShape(RoundedRectangle(cornerRadius: 16))
 
-            Spacer()
+                VStack(spacing: 20) {
+                    Text(String(format: "%.1f", hoursPerWeek) + " hrs / week")
+                        .font(.system(size: 44, design: .serif))
+                        .foregroundStyle(Color.accentTeal)
+                        .frame(maxWidth: .infinity)
+
+                    Slider(value: $hoursPerWeek, in: 1...20, step: 0.5)
+                        .tint(Color.accentTeal)
+
+                    HStack {
+                        Text("1 hr").font(.caption).foregroundStyle(.secondary)
+                        Spacer()
+                        Text("20 hrs").font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+                .padding(20)
+                .background(Color(.secondarySystemBackground))
+                .clipShape(RoundedRectangle(cornerRadius: 16))
+            }
+            .padding(.horizontal, 28)
+            .padding(.top, 8)
+            .padding(.bottom, 40)
         }
-        .padding(.horizontal, 28)
     }
 }
 
@@ -363,32 +376,36 @@ struct SummaryPage: View {
     let errorMessage: String?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 24) {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Ready to build your plan")
-                    .font(.system(.largeTitle, design: .serif, weight: .regular))
-                Text("Here's what we'll personalize for you:")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-            }
+        ScrollView {
+            VStack(alignment: .leading, spacing: 24) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Ready to build your plan")
+                        .font(.system(.title, design: .serif, weight: .regular))
+                    Text("Here's what we'll personalize for you:")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
 
-            VStack(spacing: 12) {
-                SummaryRow(icon: "scope", label: "Goal", value: goalText)
-                SummaryRow(icon: "calendar", label: "Timeline", value: "\(timeframeWeeks) weeks")
-                SummaryRow(icon: "person", label: "Starting point", value: currentSituation)
-                SummaryRow(icon: "exclamationmark.triangle", label: "Obstacle", value: biggestObstacle)
-                SummaryRow(icon: "clock", label: "Weekly commitment", value: "\(String(format: "%.1f", hoursPerWeek)) hrs/week")
-            }
+                VStack(spacing: 12) {
+                    SummaryRow(icon: "scope", label: "Goal", value: goalText)
+                    SummaryRow(icon: "calendar", label: "Timeline", value: "\(timeframeWeeks) weeks")
+                    SummaryRow(icon: "person", label: "Starting point", value: currentSituation)
+                    SummaryRow(icon: "exclamationmark.triangle", label: "Obstacle", value: biggestObstacle)
+                    SummaryRow(icon: "clock", label: "Weekly commitment", value: String(format: "%.1f", hoursPerWeek) + " hrs/week")
+                }
 
-            if let error = errorMessage {
-                Text(error).font(.caption).foregroundStyle(.red)
+                if let error = errorMessage {
+                    Text(error).font(.caption).foregroundStyle(.red)
+                }
             }
-
-            Spacer()
+            .padding(.horizontal, 28)
+            .padding(.top, 8)
+            .padding(.bottom, 40)
         }
-        .padding(.horizontal, 28)
     }
 }
+
+// MARK: - Summary Row
 
 struct SummaryRow: View {
     let icon: String
@@ -413,7 +430,7 @@ struct SummaryRow: View {
     }
 }
 
-// MARK: - Flow Layout for chips
+// MARK: - Flow Layout
 
 struct FlowLayout: Layout {
     var spacing: CGFloat = 8
